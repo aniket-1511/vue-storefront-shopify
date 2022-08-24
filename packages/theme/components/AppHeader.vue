@@ -9,7 +9,7 @@
       :class="{ 'header-on-top': isSearchOpen }"
       @click:cart="toggleCartSidebar"
       @click:wishlist="toggleWishlistSidebar"
-      @click:account="handleAccountClick"
+      @click:account="isUserAuthenticated ? $router.push(localePath({name:'my-account'})) : toggleLoginModal()"
       @enter:search="changeSearchTerm"
       @change:search="(p) => (term = p)"
     >
@@ -17,22 +17,24 @@
       <template #logo>
         <nuxt-link :to="localePath('/')" class="sf-header__logo">
           <SfImage
-            src="/icons/logo.svg"
+            src="/icons/logo.webp"
             alt="Vue Storefront Next"
             class="sf-header__logo-image"
+            :width="34"
+            :height="34"
           />
         </nuxt-link>
       </template>
 
-      <template v-if="categories.length > 0" #navigation>
+      <template v-if="menus.length > 0" #navigation>
         <div class="navigation-wrapper">
           <SfHeaderNavigationItem
-            v-for="cat in categories"
-            :key="cat.id"
+            v-for="menu in menus"
+            :key="menu.id"
             class="nav-item"
-            :data-cy="'app-header-url_' + cat.handle"
-            :label="cat.title"
-            :link="localePath('/c/' + cat.handle)"
+            :data-cy="'app-header-url_' + menu.handle"
+            :label="menu.title"
+            :link="localePath(getMenuPath(menu))"
           />
         </div>
       </template>
@@ -42,19 +44,19 @@
       <template #header-icons>
         <div class="sf-header__icons">
           <SfButton
+            v-if="isUserAuthenticated"
             class="sf-button--pure sf-header__action"
-            @click="handleAccountClick"
+            @click="$router.push(localePath({name:'my-account'}))"
           >
             <SfIcon :icon="accountIcon" size="1.25rem" />
           </SfButton>
-
-          <!-- <SfButton
+          <SfButton
+            v-else
             class="sf-button--pure sf-header__action"
-            @click="toggleWishlistSidebar"
+            @click="toggleLoginModal()"
           >
-            <SfIcon class="sf-header__icon" icon="heart" size="1.25rem" />
-          </SfButton> -->
-
+          <SfIcon :icon="accountIcon" size="1.25rem" />
+          </SfButton>
           <SfButton
             v-e2e="'app-header-cart'"
             class="sf-button--pure sf-header__action"
@@ -76,15 +78,17 @@
           :value="term"
           :icon="{ size: '1.25rem', color: '#43464E' }"
           aria-label="Search"
+          @keydown.esc="closeSearch"
+          @keydown.tab="hideSearch"
           @input="handleSearch"
           @focus="isSearchOpen = true"
         ></SfSearchBar>
       </template>
     </SfHeader>
     <SearchResults
+      v-if="isSearchOpen"
       :visible="isSearchOpen"
       :result="searchResults"
-      @close="closeSearch"
     />
     <SfOverlay :visible="isSearchOpen" @click="isSearchOpen = false" />
   </div>
@@ -98,26 +102,31 @@ import {
   SfBadge,
   SfSearchBar,
   SfIcon,
-  SfOverlay,
+  SfOverlay
 } from '@storefront-ui/vue';
-import SearchResults from './SearchResults.vue';
+import SearchResultsComp from './SearchResults.vue';
 import debounce from 'lodash/debounce';
-import useUiState from '~/composables/useUiState';
 import { onSSR } from '@vue-storefront/core';
-import { computed, ref, useRouter } from '@nuxtjs/composition-api';
-import useUiHelpers from '~/composables/useUiHelpers';
-import LocaleSelector from './LocaleSelector';
+import {
+  computed,
+  ref,
+  watch,
+  useRoute,
+  useContext,
+} from '@nuxtjs/composition-api';
+import { useUiHelpers, useUiState } from '~/composables';
+import LocaleSelector from './LocaleSelector.vue';
 
 import {
   searchGetters,
   useCategory,
   useSearch,
-  useUser,
+  useContent
 } from '@vue-storefront/shopify';
 
 export default {
   components: {
-    SearchResults,
+    SearchResults: SearchResultsComp,
     SfHeader,
     SfImage,
     SfIcon,
@@ -125,41 +134,35 @@ export default {
     SfButton,
     SfOverlay,
     SfBadge,
-    SfSearchBar,
+    SfSearchBar
   },
   props: {
     cartTotalItems: {
       type: Number,
       default: 0
     },
-    isUserAuthenticated: Boolean,
+    isUserAuthenticated: Boolean
   },
   // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   setup(props) {
+    const context = useContext();
     const { toggleCartSidebar, toggleWishlistSidebar, toggleLoginModal } =
       useUiState();
     const { changeSearchTerm, getFacetsFromURL } = useUiHelpers();
     const { search: headerSearch, result } = useSearch('header-search');
     const { search, categories } = useCategory('menuCategories');
-    const router = useRouter();
-    const { isAuthenticated } = useUser();
+    const { search: getArticles, content: articlesContent } =
+      useContent('articles');
 
     const curCatSlug = ref(getFacetsFromURL().categorySlug);
-    const accountIcon = computed(() => props.isUserAuthenticated ? 'profile_fill' : 'profile');
-
-
-     // TODO: https://github.com/DivanteLtd/vue-storefront/issues/4927
-    const handleAccountClick = () => {
-      if (isAuthenticated.value) {
-        return router.push('/my-account');
-      }
-      toggleLoginModal();
-    };
+    const accountIcon = computed(() =>
+      props.isUserAuthenticated ? 'profile_fill' : 'profile'
+    );
 
     // #region Search Section
     const isSearchOpen = ref(false);
-    const searchResults = ref(null);
     const term = ref(getFacetsFromURL().term);
+    const route = useRoute();
     const handleSearch = debounce(async (searchTerm) => {
       if (!searchTerm.target) {
         term.value = searchTerm;
@@ -168,35 +171,67 @@ export default {
       }
 
       await headerSearch({
-        term: term.value,
+        term: term.value
       });
-    }, 1000);
+      await getArticles({
+        contentType: 'article',
+        query: term.value,
+        first: 5
+      });
+    }, 500);
+
+    watch(route, () => {
+      hideSearch();
+      term.value = '';
+    });
+
+    const hideSearch = () => {
+      if (isSearchOpen.value) {
+        isSearchOpen.value = false;
+        if (document) {
+          document.body.classList.remove('no-scroll');
+        }
+      }
+    };
+
     const closeSearch = () => {
       if (!isSearchOpen.value) return;
       term.value = '';
       isSearchOpen.value = false;
     };
 
-    searchResults.value = {
-      products: computed(() => searchGetters.getItems(result.value)),
-    };
+    const searchResults = computed(() =>
+      !term.value
+        ? { products: [], articles: [] }
+        : {
+            products: searchGetters.getItems(result.value),
+            articles: articlesContent?.value?.data
+          }
+    );
     // #endregion Search Section
+
     onSSR(async () => {
       await search({ slug: '' });
     });
-    // onBeforeMount(async () => {
-    //   if(root.$i18n && !root.$cookies.get('CurLocaleLang')){
-    //     root.$cookies.set('CurLocaleLang', (root.$i18n.localeProperties.alias).toUpperCase(), {maxAge: 60 * 60 * 24 * 24000, path: '/'});
-    //   }
-    //   else if (root.$i18n && root.$cookies.get('CurLocaleLang') !== (root.$i18n.localeProperties.alias).toUpperCase()){
-    //     root.$cookies.set('CurLocaleLang', (root.$i18n.localeProperties.alias).toUpperCase(), {maxAge: 60 * 60 * 24 * 24000, path: '/'});
-    //   }
-    // })
+    const menus = computed(() => [
+      ...categories.value,
+      { id: 'blogs', title: 'Blogs', handle: context.$config.cms.blogs }
+    ]);
+
+    const getMenuPath = (menu) => {
+      if (menu.id === 'blogs') {
+        return { name: 'blogs' };
+      }
+
+      return { name: 'category', params: { slug_1: menu.handle } };
+    };
 
     return {
+      getMenuPath,
       accountIcon,
+      hideSearch,
       closeSearch,
-      handleAccountClick,
+      toggleLoginModal,
       toggleCartSidebar,
       toggleWishlistSidebar,
       changeSearchTerm,
@@ -204,10 +239,10 @@ export default {
       handleSearch,
       curCatSlug,
       searchResults,
-      categories,
-      isSearchOpen,
+      menus,
+      isSearchOpen
     };
-  },
+  }
 };
 </script>
 
@@ -229,24 +264,33 @@ export default {
 }
 .navigation-wrapper {
   display: flex;
-  white-space: nowrap;
+  width: min-content;
+}
+.sf-search-bar {
+  @include for-desktop {
+    max-width: 20rem;
+    width: 100%;
+  }
 }
 .nav-item {
+  flex: 0;
   .sf-header-navigation-item__item--mobile {
     display: none;
   }
   &--mobile {
     padding: var(--spacer-xs) 0;
   }
+  ::v-deep &__item--mobile {
+    display: block;
+  }
+  ::v-deep .nuxt-link-active {
+    color: var(--c-primary);
+    --header-navigation-item-border-color: var(--c-primary);
+  }
 }
 .cart-badge {
   position: absolute;
   bottom: 40%;
   left: 40%;
-}
-.sf-header-navigation-item {
-  ::v-deep &__item--mobile {
-    display: block;
-  }
 }
 </style>

@@ -1,39 +1,29 @@
 <template>
   <div id="home">
     <SfHero class="hero">
-      <SfLink
-            class="sf-product-card__link"
-            v-for="(hero, i) in heroes"
-            :key="i"
-            :link="hero.link"
-          >
       <SfHeroItem
+        v-for="(hero, i) in heroes"
+        :key="i"
         :title="hero.title"
         :subtitle="hero.subtitle"
         :button-text="hero.buttonText"
         :background="hero.background"
-        :image="hero.image"
+        :image="$device.isDesktopOrTablet ? hero.image.desktop : hero.image.mobile"
         :class="hero.className"
       />
-    </SfLink>
     </SfHero>
     <LazyHydrate when-visible>
-      <SfBannerGrid :banner-grid="2" class="banner-grid">
+      <SfBannerGrid :banner-grid="1" class="banner-grid">
         <template v-for="item in banners" #[item.slot]>
-          <SfLink
-                class="sf-product-card__link"
-                :key="item.slot"
-                :link="item.link"
-              >
-            <SfBanner
-              :title="item.title"
-              :subtitle="item.subtitle"
-              :description="item.description"
-              :button-text="item.buttonText"
-              :image="item.image"
-              :class="item.class"
-            />
-          </SfLink>
+          <SfBanner
+            :key="item.slot"
+            :title="item.title"
+            :subtitle="item.subtitle"
+            :description="item.description"
+            :button-text="item.buttonText"
+            :image="item.image"
+            :class="item.class"
+          />
         </template>
       </SfBannerGrid>
     </LazyHydrate>
@@ -41,12 +31,8 @@
       <RelatedProducts
         :products="products"
         :loading="productsLoading"
-        title="Recommended Products"
+        title="Match it with"
       />
-    </LazyHydrate>
-
-    <LazyHydrate>
-      <MyCustomComponent />
     </LazyHydrate>
 
     <LazyHydrate when-visible>
@@ -68,14 +54,7 @@ import {
   SfHero,
   SfBanner,
   SfCallToAction,
-  SfSection,
-  SfCarousel,
-  SfImage,
-  SfBannerGrid,
-  SfHeading,
-  SfArrow,
-  SfButton,
-  SfLink
+  SfBannerGrid
 } from '@storefront-ui/vue';
 import {
   useProduct,
@@ -83,13 +62,12 @@ import {
   productGetters
 } from '@vue-storefront/shopify';
 import {
-  computed,
-  onBeforeMount
+  computed
 } from '@nuxtjs/composition-api';
 import LazyHydrate from 'vue-lazy-hydration';
 import MobileStoreBanner from '~/components/MobileStoreBanner.vue';
-import MyCustomComponent from '~/components/MyCustomComponent.vue';
 import RelatedProducts from '~/components/RelatedProducts.vue';
+import { onSSR } from '@vue-storefront/core';
 
 export default {
   name: 'Home',
@@ -98,20 +76,11 @@ export default {
     RelatedProducts,
     SfBanner,
     SfCallToAction,
-    SfSection,
-    SfCarousel,
-    SfImage,
     SfBannerGrid,
-    SfHeading,
-    SfArrow,
-    SfButton,
     MobileStoreBanner,
-    LazyHydrate,
-    MyCustomComponent,
-    SfLink
+    LazyHydrate
   },
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  setup(contect) {
+  setup() {
     const {
       products: relatedProducts,
       search: productsSearch,
@@ -119,8 +88,8 @@ export default {
     } = useProduct('relatedProducts');
     const { cart, addItem: addToCart, isInCart } = useCart();
 
-    onBeforeMount(async () => {
-      await productsSearch({ limit: 10 });
+    onSSR(async () => {
+      await productsSearch({ limit: 8 });
     });
     return {
       products: computed(() =>
@@ -133,48 +102,47 @@ export default {
       isInCart
     };
   },
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
   data() {
     return {
       heroes: [
         {
-          title: 'Colorful summer dresses are already in our store',
-          subtitle: 'SUMMER COLLECTION 2022',
-          buttonText: 'Go To',
+          title: 'Colorful summer dresses are already in store',
+          subtitle: 'SUMMER COLLECTION 2021',
+          buttonText: 'Learn more',
           background: '#eceff1',
           image: {
             mobile:
-              'https://cdn.shopify.com/s/files/1/0582/4666/0284/files/callingallnations-cover_1_1.png?v=1632831701',
+              'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerB_328x224.jpg',
             desktop:
-              'https://cdn.shopify.com/s/files/1/0582/4666/0284/files/q221aabout2_1.png?v=1633086626'
+              'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerB_1240x400.jpg'
           },
-          link: '/c/clothings/'
+          link: '/c/women/women-clothing-shirts'
         },
         {
-          title: 'Colorful summer dresses are already in our store',
-          subtitle: 'SUMMER COLLECTION 2022',
-          buttonText: 'Go To',
+          title: 'Colorful summer dresses are already in store',
+          subtitle: 'SUMMER COLLECTION 2021',
+          buttonText: 'Learn more',
           background: '#fce4ec',
           image: {
             mobile:
-              'https://cdn.shopify.com/s/files/1/0582/4666/0284/files/IndProductPage-FTSAKI13-11-Desktop-02.jpg?v=1645088469',
+              'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerH_328x224.jpg',
             desktop:
-              'https://cdn.shopify.com/s/files/1/0582/4666/0284/files/ny_banner1.jpg?v=1645088468'
+              'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerH_1240x400.jpg'
           },
-          link: '/c/best-selling-products/'
+          link: '/c/women/women-clothing-dresses'
         },
         {
-          title: 'Colorful summer dresses are already in our store',
-          subtitle: 'SUMMER COLLECTION 2022',
-          buttonText: 'Go To',
+          title: 'Colorful summer dresses are already in store',
+          subtitle: 'SUMMER COLLECTION 2021',
+          buttonText: 'Learn more',
           background: '#efebe9',
           image: {
             mobile:
-              'https://cdn.shopify.com/s/files/1/0582/4666/0284/files/IndProductPage-FTSAKI13-11-Desktop-03.jpg?v=1645088469',
+              'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerA_328x224.jpg',
             desktop:
-              'https://cdn.shopify.com/s/files/1/0582/4666/0284/files/final_product_banner.jpg?v=1645088469'
+              'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerA_1240x400.jpg'
           },
-          link: '/c/newest-products/',
+          link: '/c/women/women-shoes-sandals',
           className:
             'sf-hero-item--position-bg-top-left sf-hero-item--align-right'
         }
@@ -182,10 +150,10 @@ export default {
       banners: [
         {
           slot: 'banner-A',
-          subtitle: 'Lorem ipsum ut amet.',
-          title: 'Veniam cupidatat.',
+          subtitle: 'Dresses',
+          title: 'Cocktail & Party',
           description:
-            'Lorem ipsum tempor exercitation sed nulla officia aliquip aliquip commodo mollit ullamco non cupidatat in nostrud ut et.',
+            'Find stunning women\'s cocktail dresses and party dresses. Stand out in lace and metallic cocktail dresses from all your favorite brands.',
           buttonText: 'Shop now',
           image: {
             mobile:
@@ -194,14 +162,14 @@ export default {
               'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerF_332x840.jpg'
           },
           class: 'sf-banner--slim desktop-only',
-          link: '/p/Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzczODY5MjkwNzAyNjg=/t-shirt-32'
+          link: '/c/women/women-clothing-skirts'
         },
         {
           slot: 'banner-B',
-          subtitle: 'In nostrud ea.',
-          title: 'Deserunt eu aute est incididunt.',
+          subtitle: 'Dresses',
+          title: 'Linen Dresses',
           description:
-            'Reprehenderit excepteur pariatur excepteur ea incididunt ut ex consequat in non aute qui exercitation nulla.',
+            'Find stunning women\'s cocktail dresses and party dresses. Stand out in lace and metallic cocktail dresses from all your favorite brands.',
           buttonText: 'Shop now',
           image: {
             mobile:
@@ -210,12 +178,12 @@ export default {
               'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerE_496x840.jpg'
           },
           class: 'sf-banner--slim banner-central desktop-only',
-          link: '/p/Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzcxNDkwNzM2MjkzNzI=/t-shirt-1'
+          link: '/c/women/women-clothing-dresses'
         },
         {
           slot: 'banner-C',
-          subtitle: 'Sed in officia duis.',
-          title: 'Excepteur ut fugiat mollit eiusmod ut occaecat id sint enim.',
+          subtitle: 'T-Shirts',
+          title: 'The Office Life',
           image: {
             mobile:
               'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerC_328x343.jpg',
@@ -223,12 +191,12 @@ export default {
               'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerC_332x400.jpg'
           },
           class: 'sf-banner--slim banner__tshirt',
-          link: '/p/Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzcxNTQzNjg4Mzk4Njg=/t-shirt-5'
+          link: '/c/women/women-clothing-shirts'
         },
         {
           slot: 'banner-D',
-          subtitle: 'Ullamco consequat magna.',
-          title: 'Labore anim incididunt aliqua anim.',
+          subtitle: 'Summer Sandals',
+          title: 'Eco Sandals',
           image: {
             mobile:
               'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerG_328x343.jpg',
@@ -236,13 +204,12 @@ export default {
               'https://cdn.shopify.com/s/files/1/0407/1902/4288/files/bannerG_332x400.jpg'
           },
           class: 'sf-banner--slim',
-          link: '/p/Z2lkOi8vc2hvcGlmeS9Qcm9kdWN0LzczODY5MzA1MTIwNjA=/t-shirt-58'
+          link: '/c/women/women-shoes-sandals'
         }
       ]
     };
   },
   methods: {
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
     toggleWishlist(index) {
       this.products[index].isInWishlist = !this.products[index].isInWishlist;
     }
@@ -250,25 +217,7 @@ export default {
 };
 </script>
 
-<style lang="postcss" scoped>
-.article-meta h4 a {
-  color: #111111;
-  font-weight: 600;
-  font-size: 20px;
-}
-.article-meta {
-  margin-top: 10px;
-}
-.article-item__meta-item:not(:last-child)::after {
-  display: inline-block;
-  content: "";
-  width: 5px;
-  height: 5px;
-  margin: -1px 10px 0 10px;
-  border-radius: 100%;
-  background: rgba(0, 0, 0, 0.4);
-  vertical-align: middle;
-}
+<style lang="scss" scoped>
 #home {
   box-sizing: border-box;
   padding: 0 var(--spacer-sm);
@@ -278,13 +227,9 @@ export default {
     margin: 0 auto;
   }
 }
-
 .hero {
   margin: var(--spacer-xl) auto var(--spacer-lg);
   --hero-item-background-position: center;
-  ::v-deep .sf-link:hover {
-    color: var(--c-white);
-  }
   @include for-desktop {
     margin: var(--spacer-xl) auto var(--spacer-2xl);
   }
@@ -293,20 +238,22 @@ export default {
       --hero-item-background-position: left;
       @include for-mobile {
         --hero-item-background-position: 30%;
-        --hero-item-wrapper-text-align: right;
-        --hero-item-subtitle-width: 100%;
-        --hero-item-title-width: 100%;
-        --hero-item-wrapper-padding: var(--spacer-sm) var(--spacer-sm)
-          var(--spacer-sm) var(--spacer-2xl);
+        ::v-deep .sf-hero-item__subtitle,
+        ::v-deep .sf-hero-item__title {
+          text-align: right;
+          width: 100%;
+          padding-left: var(--spacer-sm);
+        }
       }
     }
   }
+  ::v-deep .sf-hero__control {
+    &--right,
+    &--left {
+      display: none;
+    }
+  }
 }
-
-::v-deep .sf-hero__controls {
-  --hero-controls-display: none;
-}
-
 .banner-grid {
   --banner-container-width: 50%;
   margin: var(--spacer-xl) 0;
@@ -317,10 +264,10 @@ export default {
     margin: var(--spacer-2xl) 0;
     ::v-deep .sf-link {
       --button-width: auto;
+      text-decoration: none;
     }
   }
 }
-
 .banner {
   &__tshirt {
     background-position: left;
@@ -331,7 +278,6 @@ export default {
     }
   }
 }
-
 .similar-products {
   display: flex;
   justify-content: space-between;
@@ -345,7 +291,6 @@ export default {
     padding-bottom: 0;
   }
 }
-
 .call-to-action {
   background-position: right;
   margin: var(--spacer-xs) 0;
@@ -353,9 +298,8 @@ export default {
     margin: var(--spacer-xl) 0 var(--spacer-2xl) 0;
   }
 }
-
 .carousel {
-  margin: 0 calc(var(--spacer-sm) * -1) 0 0;
+  margin: 0 calc(0 - var(--spacer-sm)) 0 0;
   @include for-desktop {
     margin: 0;
   }
@@ -367,6 +311,11 @@ export default {
     &__product {
       --product-card-add-button-transform: translate3d(0, 30%, 0);
     }
+  }
+  ::v-deep .sf-arrow--long .sf-arrow--right {
+    --arrow-icon-transform: rotate(180deg);
+    -webkit-transform-origin: center;
+    transform-origin: center;
   }
 }
 </style>

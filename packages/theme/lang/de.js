@@ -163,6 +163,9 @@ export default {
   'Remove coupon': 'Gutschein entfernen',
   'This promo code is invalid': 'Dieser Gutscheincode ist ungültig',
   'Search results': 'Search results',
+  'Out of Stock': 'Ausverkauft',
   'You haven\'t searched for items yet': 'You haven\'t searched for items yet',
-  'Let\'s start now - we\'ll help you': 'Let\'s start now - we\'ll help you'
+  'Let\'s start now - we\'ll help you': 'Let\'s start now - we\'ll help you',
+  'on': 'on',
+  'Add to Cart': 'Añadir al carrito'
 };

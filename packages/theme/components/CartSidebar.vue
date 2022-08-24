@@ -51,6 +51,12 @@
                     />
                   </div>
                 </template>
+                <template #actions>
+                  <div />
+                </template>
+                <template #more-actions>
+                  <div />
+                </template>
               </SfCollectedProduct>
             </transition-group>
           </div>
@@ -60,7 +66,9 @@
             <SfImage
               alt="Empty bag"
               class="empty-cart__image"
-              src="/icons/empty-cart.svg"
+              src="/icons/empty-cart.webp"
+              :width="256"
+              :height="173"
             />
             <SfHeading
               title="Your cart is empty"
@@ -75,6 +83,44 @@
       <template #content-bottom>
         <transition name="sf-fade">
           <div v-if="totalItems">
+            <div v-if="!appliedCoupon" class="coupon-form-wrapper">
+              <SfInput
+                v-model="couponcode"
+                :value="couponcode"
+                label="Apply coupon"
+                type="text"
+                :icon='{"icon":"","color":"","size":""}'
+                :valid="isValidCoupon"
+                :error-message="errorMsg"
+                :required="true"
+                :disabled="false"
+                :has-show-password="false"
+                class="coupon-code-input"
+              />
+              <SfButton
+                  class="sf-button--full-width color-secondary sf-apply-coupon"
+                  @click="handleApplyCoupon(couponcode)"
+                >
+                  {{ $t('Apply') }}
+              </SfButton>
+            </div>
+            <SfProperty
+            v-if="totalDiscount"
+              class="sf-property--full-width sf-property--large my-cart__discount"
+            >
+            <template #name>
+              <span class="sf-property__name applied-discount">{{displayDiscountStr}}<SfIcon v-if="appliedCoupon" class="remove-coupon" icon="cross" size="xxs" color="green-primary" @click="handleRemoveCoupon(couponcode)"/></span>
+            </template>
+              <template #value>
+                <SfPrice
+                  v-if="!totalDiscount.percentage"
+                  :regular="$n(totalDiscount.amount, 'currency')"
+                />
+                <SfPrice
+                v-else
+                :regular="$n(totals.subtotal * totalDiscount.percentage/ (100 - totalDiscount.percentage), 'currency')"/>
+              </template>
+            </SfProperty>
             <SfProperty
               name="Estimated Total"
               class="sf-property--full-width sf-property--large my-cart__total-price"
@@ -82,6 +128,17 @@
               <template #value>
                 <SfPrice
                   :regular="$n(totals.subtotal, 'currency')"
+                />
+              </template>
+            </SfProperty>
+            <SfProperty
+            v-if="totalSavings"
+              name="Total Savings"
+              class="sf-property--full-width sf-property--large my-cart__total-price"
+            >
+              <template #value>
+                <SfPrice
+                  :regular="$n(totalSavings, 'currency')"
                 />
               </template>
             </SfProperty>
@@ -93,7 +150,7 @@
                 {{ $t('Go to checkout') }}
               </SfButton>
             </SfLink>
-          </div>
+            </div>
           <div v-else>
             <SfButton
               class="sf-button--full-width color-primary"
@@ -111,15 +168,16 @@ import {
   SfSidebar,
   SfHeading,
   SfButton,
-  SfIcon,
   SfProperty,
   SfPrice,
   SfCollectedProduct,
   SfImage,
   SfLink,
-  SfQuantitySelector
+  SfInput,
+  SfQuantitySelector,
+  SfIcon
 } from '@storefront-ui/vue';
-import { computed, onBeforeMount } from '@nuxtjs/composition-api';
+import { computed, ref, useRoute } from '@nuxtjs/composition-api';
 import { useCart, useUser, cartGetters } from '@vue-storefront/shopify';
 import { useUiState, useUiNotification } from '~/composables';
 import debounce from 'lodash.debounce';
@@ -130,32 +188,73 @@ export default {
     SfSidebar,
     SfButton,
     SfHeading,
-    SfIcon,
     SfLink,
     SfProperty,
     SfPrice,
+    SfInput,
     SfCollectedProduct,
     SfImage,
-    SfQuantitySelector
+    SfQuantitySelector,
+    SfIcon
   },
-  setup(_, { root }) {
+  setup() {
+    const route = useRoute();
+    const isValidCoupon = ref(true);
+    const errorMsg = ref("Invalid coupon code");
     const { isCartSidebarOpen, toggleCartSidebar } = useUiState();
-    const { cart, removeItem, updateItemQty, loading } = useCart();
+    const { cart, removeItem, updateItemQty, loading, applyCoupon, removeCoupon } = useCart();
     const { isAuthenticated } = useUser();
     const { send: sendNotification, notifications } = useUiNotification();
+    const couponcode= '';
     const products = computed(() => cartGetters.getItems(cart.value));
     const totals = computed(() => cartGetters.getTotals(cart.value));
+    const lineItemsSubtotalPrice = computed(() => cartGetters.getSubTotal(cart.value));
     const totalItems = computed(() => cartGetters.getTotalItems(cart.value));
+    const totalDiscount = computed(() => cartGetters.getTotalDiscount(cart.value));
+    const totalSavings = computed(() => {
+      let calculatedTotalSavings = 0;
+      products.value.forEach((item) => {
+        if (item.variant.compareAtPriceV2 !== null) {
+          calculatedTotalSavings +=
+            (parseFloat(item.variant.compareAtPriceV2?.amount) -
+              parseFloat(item.variant.priceV2.amount)) *
+            item.quantity;
+        }
+      });
+      if (totalDiscount.value > 0 || Object.keys(totalDiscount.value).length > 0) {
+        calculatedTotalSavings += totalDiscount.value.percentage ? cart.value.lineItemsSubtotalPrice.amount * totalDiscount.value.percentage/100 : parseFloat(totalDiscount.value.amount);
+      }
+      return calculatedTotalSavings;
+    });
     const checkoutURL = computed(() => cartGetters.getcheckoutURL(cart.value));
+    const appliedCoupon = computed(() => cartGetters.getCoupon(cart.value));
+    const displayDiscountStr = computed(() => appliedCoupon.value ? `Discount [${appliedCoupon.value}${totalDiscount.value.percentage ? ' | ' + route?.value?.$n(totalDiscount.value.percentage/100, 'percent'): ''}]`: 'Discount');
+    
+    const handleApplyCoupon = async (couponCode) => {
+      if(couponCode && couponCode !== ""){
+        await applyCoupon({couponCode}).then(() =>{
+          if(cart.value.checkoutUserErrors.length > 0){
+            errorMsg.value = cart.value.checkoutUserErrors[0];
+            isValidCoupon.value = false;
+          }else{
+            isValidCoupon.value = true;
+          }
+        });
+      }
+    }
+    const handleRemoveCoupon = async (couponCode) => {
+      await removeCoupon({couponCode}).then(() =>{
+          errorMsg.value = "Coupon removed";
+        });
+    }
     const handleCheckout = (checkoutUrl) => {
       setTimeout(() => {
-        window.location.replace(checkoutUrl)
-      }, 400)
+        window.location.href = checkoutUrl;
+      }, 300)
     }
-
     const updateQuantity = debounce(async ({ product, quantity }) => {
       await updateItemQty({ product, quantity });
-    }, 500);
+    }, 300);
 
     return {
       updateQuantity,
@@ -168,10 +267,20 @@ export default {
       isCartSidebarOpen,
       toggleCartSidebar,
       totals,
+      lineItemsSubtotalPrice,
       totalItems,
+      totalDiscount,
+      totalSavings,
       cartGetters,
       sendNotification,
-      notifications
+      notifications,
+      handleApplyCoupon,
+      couponcode,
+      isValidCoupon,
+      errorMsg,
+      appliedCoupon,
+      handleRemoveCoupon,
+      displayDiscountStr
     };
   }
 };
@@ -203,6 +312,15 @@ export default {
     --price-font-weight: var(--font-weight--medium);
     margin: 0 0 var(--spacer-base) 0;
   }
+  &__discount {margin-bottom: 30px;}
+}
+.applied-discount {
+  display: flex;
+  align-items: center;
+}
+.remove-coupon {
+  margin: 0 5px;
+  cursor: pointer;
 }
 .empty-cart {
   --heading-description-margin: 0 0 var(--spacer-xl) 0;
@@ -270,9 +388,24 @@ export default {
     --cp-compare-opacity: 1;
     @include for-desktop {
       .collected-product__properties {
-        display: none;
+        display: block;
       }
     }
   }
+}
+::v-deep .sf-collected-product__configuration {
+  display: block;
+}
+.coupon-form-wrapper{
+  display: flex;
+  margin-bottom: 40px;
+  max-height:50px; 
+}
+.coupon-code-input{
+  flex: 0 0 60%;
+  max-width: 60%;
+}
+.sf-apply-coupon{
+  flex-grow: 1;
 }
 </style>
